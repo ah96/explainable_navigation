@@ -1,0 +1,43 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Global Options:
+    Fixed Frame: odom
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+    - Class: rviz_default_plugins/Map
+      Name: LocalCostmap
+      Enabled: true
+      Topic:
+        Value: /local_costmap/costmap
+      Color Scheme: costmap
+    - Class: rviz_default_plugins/Path
+      Name: GlobalPlan
+      Enabled: true
+      Color: 25; 25; 255
+      Topic:
+        Value: /plan
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ExplanationLayer
+      Enabled: true
+      Topic:
+        Value: /nav_explain/layer
+      Style: Boxes
+      Size (m): 0.03
+      Color Transformer: RGB8
+    - Class: rviz_default_plugins/Image
+      Name: ExplanationImage
+      Enabled: true
+      Topic:
+        Value: /nav_explain/image
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 8
+      Name: Current View

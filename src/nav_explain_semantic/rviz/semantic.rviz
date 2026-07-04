@@ -1,0 +1,37 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Global Options:
+    Fixed Frame: map
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: SemanticLayer
+      Enabled: true
+      Topic:
+        Value: /vtne/semantic_layer
+      Style: Boxes
+      Size (m): 0.03
+      Color Transformer: RGB8
+    - Class: rviz_default_plugins/Path
+      Name: GlobalPlan
+      Enabled: true
+      Color: 25; 25; 255
+      Topic:
+        Value: /plan
+    - Class: rviz_default_plugins/MarkerArray
+      Name: ExplanationText
+      Enabled: true
+      Topic:
+        Value: /vtne/explanation_markers
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 12
+      Name: Current View

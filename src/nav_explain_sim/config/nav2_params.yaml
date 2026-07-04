@@ -1,0 +1,115 @@
+# Nav2 parameters for the full-fidelity reproduction, derived from the original
+# TIAGo move_base + TEB configuration
+# (navigation_explainer/tiago_simulation_config_files/move_base_base/...).
+#
+# This file is part of the OPTIONAL full-sim path and is NOT needed for the
+# headless reproduction. It configures Nav2's controller_server with the TEB
+# controller so the explainer's Ros2ControllerPlanner can query the real planner.
+#
+# Requires (install yourself):
+#   sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup \
+#                    ros-humble-teb-local-planner
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 10.0
+    min_x_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "teb_local_planner::TebLocalPlannerROS"
+      # --- Trajectory (from local_planner.yaml) ---
+      teb_autosize: True
+      dt_ref: 0.3
+      dt_hysteresis: 0.1
+      max_global_plan_lookahead_dist: 5.0
+      global_plan_viapoint_sep: 1.0
+      min_samples: 5
+      exact_arc_length: True
+      # --- Robot (generic TIAGo-like diff drive) ---
+      max_vel_x: 0.5
+      max_vel_x_backwards: 0.15
+      max_vel_theta: 0.6
+      acc_lim_x: 0.2
+      acc_lim_theta: 0.785   # 45 deg in rad
+      footprint_model:
+        type: "circular"
+        radius: 0.275
+      # --- Goal tolerance ---
+      xy_goal_tolerance: 0.2
+      yaw_goal_tolerance: 0.2
+      free_goal_vel: False
+      # --- Obstacles ---
+      min_obstacle_dist: 0.06
+      include_costmap_obstacles: True
+      costmap_obstacles_behind_robot_dist: 1.0
+      inflation_dist: 0.5
+      # --- Optimization (TEB weights) ---
+      no_inner_iterations: 5
+      no_outer_iterations: 4
+      penalty_epsilon: 0.1
+      weight_max_vel_x: 2.0
+      weight_max_vel_theta: 10.0
+      weight_acc_lim_x: 1.0
+      weight_acc_lim_theta: 1.0
+      weight_kinematics_nh: 1000.0
+      weight_kinematics_forward_drive: 500.0
+      weight_optimaltime: 1.0
+      weight_obstacle: 50.0
+      weight_inflation: 5.0
+      weight_viapoint: 0.75
+      enable_homotopy_class_planning: False
+      enable_multithreading: True
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 1.0
+      global_frame: odom
+      robot_base_frame: base_footprint
+      rolling_window: true
+      width: 4.0
+      height: 4.0
+      resolution: 0.025
+      robot_radius: 0.275
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          obstacle_max_range: 3.0
+          raytrace_max_range: 4.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 5.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      robot_radius: 0.275
+      resolution: 0.05
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 25.0
+
+planner_server:
+  ros__parameters:
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
