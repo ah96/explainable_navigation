@@ -156,7 +156,7 @@ All paths are below `nav_explain_core/nav_explain_core/` unless a package is nam
 - Row 0 of every perturbation matrix is the real scene, and column 0 is the feature that is never switched off. All methods rely on both.
 - A cell index is `grid[row, col]`, where the row counts along y and the column along x. `world_to_pixel` returns `(col, row)`.
 - A costmap method does not query the planner. It receives a dataset from `build_perturbation_dataset`. The visuo-textual pipeline has its own loop, since its perturbations are affordances and not segments.
-- Code that no command-line tool, node or launch file uses is removed. The `humble` branch holds what was removed.
+- Code that no command-line tool, node or launch file uses is removed. The first commit of the repository (`45ccafd`) holds what was removed.
 - Numbers that decide a result are named constants or fields of a configuration class, for example `ElasticBandConfig`, not literals in the code.
 - A scripted run uses no clock and no random number. Measured runtimes are written to their own file, so that every other file of a run is the same on every machine.
 - A recorded result is read and never written. `results.py` needs only the standard library, so that the reported numbers can be recomputed anywhere.
@@ -347,7 +347,7 @@ The HiXRoN part was ported from the nodes of the ICSR 2023, ICRA 2024 and TAHRI 
 
 The planner is therefore the main difference to the original work. It reproduces the sign of the effect of each obstacle, and with it the colours, rules and suggestions. It does not reproduce the numbers of TEB.
 
-Parts of the port that no method uses are not on this branch: the other trajectory distances (SSPD, Hausdorff, Fréchet, DTW, LCSS, EDR, ERP, OWD), the ternary QSR calculus, the two message types, and the simulation assets for Gazebo Classic with the TEB parameters. They are on the `humble` branch.
+Parts of the port that no method uses are not on this branch: the other trajectory distances (SSPD, Hausdorff, Fréchet, DTW, LCSS, EDR, ERP, OWD), the ternary QSR calculus, the two message types, and the simulation assets for Gazebo Classic with the TEB parameters. They are in the first commit of the repository (`45ccafd`).
 
 ## 15. Open work
 

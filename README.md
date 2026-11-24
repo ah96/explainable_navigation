@@ -13,10 +13,9 @@ Methods that explain why a mobile robot leaves its planned path. The robot's loc
 
 ## Branches
 
-| Branch | For | State |
-|---|---|---|
-| `lyrical` | ROS 2 Lyrical on Ubuntu 26.04 | this branch, see "Status" for what was checked |
-| `humble` | ROS 2 Humble | the first state of the repository, kept unchanged. It still holds what this branch removed as unused. |
+The repository has one branch, `lyrical`, for ROS 2 Lyrical on Ubuntu 26.04. The section "Status" lists what was checked.
+
+The state for ROS 2 Humble is the first commit of the repository (`45ccafd`). It still holds what this branch removed as unused. `git checkout 45ccafd` shows it.
 
 ## What it produces
 
