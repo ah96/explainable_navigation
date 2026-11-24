@@ -1,12 +1,11 @@
-"""Small geometric value types shared across the core.
-
-Kept deliberately dependency-light (only numpy) so the core stays ROS-free.
-"""
+"""Poses, angles and planar transforms shared across the core."""
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -18,32 +17,9 @@ class Pose2D:
     theta: float = 0.0
 
 
-@dataclass(frozen=True)
-class VelLimits:
-    """Robot velocity/acceleration limits.
-
-    Defaults mirror the TEB configuration of the original work, which is kept
-    in ``nav_explain_sim/config/nav2_params.yaml``.
-    """
-
-    max_vel_x: float = 0.5
-    max_vel_theta: float = 0.6
-    acc_lim_x: float = 0.2
-
-
 def yaw_from_quaternion(z: float, w: float) -> float:
-    """Yaw (rad) from the z/w components of a quaternion with x=y=0.
-
-    The original ROS1 code stored only ``orientation.z`` and ``orientation.w``
-    for the (planar) costmap origin and robot pose, so this 2-component form is
-    all that is needed.
-    """
+    """Yaw (rad) from the z/w components of a quaternion with x=y=0."""
     return 2.0 * math.atan2(z, w)
-
-
-def quaternion_from_yaw(theta: float) -> tuple[float, float]:
-    """(z, w) quaternion components for a planar yaw."""
-    return math.sin(theta / 2.0), math.cos(theta / 2.0)
 
 
 def normalize_angle(angle: float) -> float:
@@ -54,3 +30,20 @@ def normalize_angle(angle: float) -> float:
     elif a > math.pi:
         a -= 2.0 * math.pi
     return a
+
+
+def transform_points(points: np.ndarray, tx: float, ty: float, yaw: float) -> np.ndarray:
+    """Express ``(N, 2)`` points of a source frame in a target frame.
+
+    ``(tx, ty, yaw)`` is the pose of the source frame in the target frame, which
+    is what a TF lookup from source to target returns.
+    """
+    points = np.asarray(points, dtype=np.float64).reshape(-1, 2)
+    c, s = math.cos(yaw), math.sin(yaw)
+    return points @ np.array([[c, s], [-s, c]]) + (tx, ty)
+
+
+def transform_pose(pose: Pose2D, tx: float, ty: float, yaw: float) -> Pose2D:
+    """Express a pose of a source frame in a target frame, see :func:`transform_points`."""
+    (x, y), = transform_points([[pose.x, pose.y]], tx, ty, yaw)
+    return Pose2D(float(x), float(y), normalize_angle(pose.theta + yaw))

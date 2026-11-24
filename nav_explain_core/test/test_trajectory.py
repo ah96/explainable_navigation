@@ -1,8 +1,11 @@
-"""Trajectory-distance metrics."""
+"""The deviation, the plan ahead of the robot and the planar transform."""
+
+import math
 
 import numpy as np
 
 from nav_explain_core import trajectory as tj
+from nav_explain_core.geometry import Pose2D, transform_points, transform_pose
 
 
 def test_deviation_identical_zero():
@@ -21,24 +24,17 @@ def test_deviation_empty():
     assert tj.deviation(np.empty((0, 2)), glob) == 0.0
 
 
-def test_hausdorff_symmetric_and_nonneg():
-    a = np.array([[0.0, 0.0], [0.0, 1.0], [0.0, 2.0]])
-    b = np.array([[1.0, 0.0], [1.0, 2.0]])
-    h = tj.hausdorff(a, b)
-    assert h == tj.hausdorff(b, a)          # symmetric
-    assert h is not None and h >= 1.0        # bug-fixed: returns a value
+def test_remaining_plan_starts_at_the_point_nearest_to_the_robot():
+    plan = np.column_stack([np.zeros(5), np.arange(5.0)])
+    assert np.array_equal(tj.remaining_plan(plan, 0.3, 2.2), plan[2:])
+    assert np.array_equal(tj.remaining_plan(plan, 0.0, -1.0), plan)  # robot before the start
+    assert tj.remaining_plan(np.empty((0, 2)), 0.0, 0.0).shape == (0, 2)
 
 
-def test_metrics_identical_are_trivial():
-    t = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]])
-    assert tj.sspd(t, t) == 0.0
-    assert tj.dtw(t, t) == 0.0
-    assert tj.discrete_frechet(t, t) == 0.0
-    assert tj.hausdorff(t, t) == 0.0
-
-
-def test_dtw_and_frechet_positive_for_shifted():
-    a = np.array([[0.0, 0.0], [0.0, 1.0], [0.0, 2.0]])
-    b = a + np.array([1.0, 0.0])
-    assert tj.dtw(a, b) > 0
-    assert abs(tj.discrete_frechet(a, b) - 1.0) < 1e-9
+def test_transform_expresses_points_and_poses_in_the_target_frame():
+    # the source frame sits at (1, 2) of the target frame, turned by 90 degrees
+    tx, ty, yaw = 1.0, 2.0, math.pi / 2
+    assert np.allclose(transform_points([[1.0, 0.0], [0.0, 1.0]], tx, ty, yaw), [[1.0, 3.0], [0.0, 2.0]])
+    pose = transform_pose(Pose2D(1.0, 0.0, math.pi), tx, ty, yaw)
+    assert np.allclose((pose.x, pose.y, pose.theta), (1.0, 3.0, -math.pi / 2))
+    assert transform_pose(Pose2D(0.5, -0.5, 0.3), 0.0, 0.0, 0.0) == Pose2D(0.5, -0.5, 0.3)

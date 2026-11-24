@@ -84,9 +84,14 @@ def slic_obstacle_segments(
         segments[raw == slic_label] = next_label
         next_label += 1
 
+    # SLIC leaves an obstacle of a single cell without a label. Such cells form
+    # one more segment, so that no obstacle is invisible to the explanation.
+    unlabelled = mask & (segments == 0)
+    if unlabelled.any():
+        segments[unlabelled] = next_label
+        next_label += 1
+
     n_obstacles = next_label - 1
-    if n_obstacles == 0:
-        return segments
     if n_obstacles < n_target:
         segments = split_until_n(segments, n_target)
     elif n_obstacles > n_target:
@@ -173,8 +178,3 @@ def _relabel_contiguous(segments: np.ndarray) -> np.ndarray:
     ):
         out[segments == old] = new_label
     return out
-
-
-def n_features(segments: np.ndarray) -> int:
-    """Number of interpretable features = free space (0) + obstacle segments."""
-    return int(np.unique(segments).shape[0])

@@ -1,7 +1,6 @@
 """End-to-end LIME explanation of a local-path-planning decision.
 
-``LimeCostmapExplainer.explain`` is the ROS-free equivalent of the original
-``lime_rt_pub`` orchestration:
+The ROS-free equivalent of the original ``lime_rt_pub`` orchestration:
 
 1. normalise the local costmap (lethal->99, else->0);
 2. segment it into obstacle features (SLIC + split-until-N);
@@ -11,9 +10,9 @@
 5. fit the kernel-weighted Ridge surrogate;
 6. colour each segment by its coefficient.
 
-Steps 1 to 4 are :func:`~nav_explain_core.perturbation_dataset.build_perturbation_dataset`.
-A dataset that already exists can be explained with ``explain_dataset``, which
-needs no further planner query.
+Steps 1 to 4 are :func:`~nav_explain_core.perturbation_dataset.build_perturbation_dataset`,
+which is shared with the other methods. Steps 5 and 6 are
+``LimeCostmapExplainer.explain``, which needs no planner query.
 """
 
 from __future__ import annotations
@@ -23,14 +22,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..perturbation import MODES
-from ..perturbation_dataset import (
-    DEFAULT_SEGMENTS,
-    PerturbationDataset,
-    ScenarioInstance,
-    build_perturbation_dataset,
-)
-from ..planner.base import PlannerBackend
+from ..perturbation_dataset import PerturbationDataset
 from .coloring import colorize_segments
 from .ridge_explainer import Explanation, RidgeExplainer
 
@@ -64,29 +56,11 @@ class ExplanationResult:
 class LimeCostmapExplainer:
     """Explains a local planner's deviation from the global plan with LIME."""
 
-    def __init__(
-        self,
-        planner: PlannerBackend,
-        mode: str = "one_off",
-        explainer: RidgeExplainer | None = None,
-        n_target_segments: int = DEFAULT_SEGMENTS,
-    ) -> None:
-        if mode not in MODES:
-            raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
-        self.planner = planner
-        self.mode = mode
+    def __init__(self, explainer: RidgeExplainer | None = None) -> None:
         self.explainer = explainer or RidgeExplainer()
-        self.n_target_segments = n_target_segments
 
-    def explain(self, instance: ScenarioInstance) -> ExplanationResult:
-        """Query the planner for ``instance`` and explain the result."""
-        dataset = build_perturbation_dataset(
-            instance, self.planner, self.n_target_segments, self.mode
-        )
-        return self.explain_dataset(dataset)
-
-    def explain_dataset(self, dataset: PerturbationDataset) -> ExplanationResult:
-        """Fit the surrogate on an existing dataset (no planner query)."""
+    def explain(self, dataset: PerturbationDataset) -> ExplanationResult:
+        """Fit the surrogate on a perturbation dataset and colour the segments."""
         t0 = time.perf_counter()
         explanation = self.explainer.explain(
             dataset.data,
@@ -94,7 +68,7 @@ class LimeCostmapExplainer:
             segment_labels=dataset.labels,
             num_features=dataset.n_features,
         )
-        image = colorize_segments(dataset.segments, explanation)
+        image = colorize_segments(dataset.segments, explanation.coef)
         timings = dict(dataset.timings)
         timings["surrogate_s"] = time.perf_counter() - t0
         timings["total_s"] = sum(timings.values())

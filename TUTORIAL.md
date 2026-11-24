@@ -15,7 +15,7 @@ For a reader who is new to the topic. Each section on code names its file.
 9. Running it
 10. The live nodes
 11. Tests
-12. Simulation assets
+12. Using a simulation
 13. Where the code comes from
 14. Open work
 
@@ -52,12 +52,12 @@ A deviation can look like an error to a person nearby. An explanation that names
 
 The planner is a function from a scene to a local plan. The interface is `PlannerBackend` in `nav_explain_core/nav_explain_core/planner/base.py`: a `PlanRequest` holds the costmap, its geometry, the global plan and the robot pose, and a `PlanResult` holds the local plan.
 
-The one number every method explains is the **deviation**: for each point of the local plan, the distance to the nearest point of the global plan, summed over the local plan. It is `deviation` in `nav_explain_core/nav_explain_core/trajectory.py`. It is 0 when the robot follows its plan, and it grows when the robot detours.
+The one number every method explains is the **deviation**: for each point of the local plan, the distance to the nearest point of the global plan, summed over the local plan. It is `deviation` in `nav_explain_core/nav_explain_core/trajectory.py`. It is small when the robot follows its plan, and it grows when the robot detours. It is not exactly 0 on the plan, since the distance is taken to the points of the global plan and not to the lines between them.
 
 To explain a costmap, the code prepares a **perturbation dataset** (`nav_explain_core/nav_explain_core/perturbation_dataset.py`):
 
 1. The costmap is reduced to obstacle or free. Cells of value 99 or 100 are obstacles (`normalize_costmap` in `costmap.py`).
-2. The obstacles are cut into segments, by default 8 (`segmentation.py`). Free space is one more segment, with label 0.
+2. The obstacles are cut into segments, by default 8 (`segmentation.py`). Free space is one more segment, with label 0. A costmap without obstacles has no segment, and every method then answers that there is nothing to explain.
 3. Perturbations are built (`perturbation.py`). Each is a row of ones and zeros, one entry per segment. A zero removes that segment from the costmap.
 4. The planner is asked once per perturbation, and the deviation is stored.
 
@@ -95,17 +95,13 @@ LIME then gives one coefficient per feature (`pipeline.py`). The visual explanat
 
 ### Qualitative spatial reasoning (`nav_explain_core/nav_explain_core/semantic/qsr.py`)
 
-Two calculi are implemented. The single-cross calculus names one of four quadrants around the robot's heading: `left/front`, `right/front`, `left/back`, `right/back`. The ternary calculus combines distance (`close`, `distant`) with direction (`front`, `left`, `back`, `right`), for example `close-front`.
-
-### Trajectory metrics (`nav_explain_core/nav_explain_core/trajectory.py`)
-
-Besides the deviation, the file holds a small library of distances between two paths: SSPD, Hausdorff, discrete Fréchet, DTW, LCSS, EDR, ERP and OWD.
+The single-cross calculus names one of four quadrants around the robot's heading: `left/front`, `right/front`, `left/back`, `right/back`.
 
 ## 6. Design choices and why
 
 - **The core has no ROS.** `nav_explain_core` is plain Python with NumPy, SciPy, scikit-learn and scikit-image. The methods can then be run, tested and studied on any computer, and ROS is needed only to connect them to a robot.
-- **One dataset for all costmap methods.** The planner queries take almost all of the time. SHAP, Anchors and the counterfactual need the same `full_2n` set, so they read one `PerturbationDataset`, and comparing them costs one planner pass. LIME uses the `one_off` set, since that keeps a single explanation fast.
-- **The planner is behind an interface.** A method knows only `PlannerBackend`. The built-in planner can be replaced by a real controller without a change to any method.
+- **Every costmap method is a function of a dataset.** The planner queries take almost all of the time. SHAP, Anchors and the counterfactual need the same `full_2n` set, so they read one `PerturbationDataset`, and comparing them costs one planner pass. LIME uses the `one_off` set, since that keeps a single explanation fast.
+- **The planner is behind an interface.** A method knows only `PlannerBackend`. The built-in planner can be replaced by another one, for example by the controller of a navigation stack, without a change to any method.
 - **A deterministic planner.** `ElasticBandPlanner` (`planner/elastic_band.py`) moves the points of the path under three forces: smoothness, distance from obstacles, and a pull back to the global plan. It runs a fixed number of sweeps and uses no random number. The same scene therefore always gives the same explanation, which a planner with random restarts would not.
 - **A fixed number of segments.** The segmentation splits or merges until it has the requested number. The number of planner queries is then known in advance, and explanations of different scenes can be compared.
 - **Dependencies as system packages.** A ROS 2 node runs in the system Python, where `rclpy` is installed. Each `package.xml` therefore names the Ubuntu packages of the Python libraries, and `rosdep` installs them next to ROS.
@@ -115,13 +111,13 @@ Besides the deviation, the file holds a small library of distances between two p
 
 All paths are below `nav_explain_core/nav_explain_core/` unless a package is named.
 
-1. `costmap.py`, `geometry.py`: the grid, the conversion between metres and cells, poses and angles.
-2. `trajectory.py`: the deviation.
+1. `costmap.py`, `geometry.py`: the grid, the conversion between metres and cells, poses, angles and the transform between two frames.
+2. `trajectory.py`: the deviation, and the part of a plan that lies ahead of the robot.
 3. `planner/base.py`, then `planner/elastic_band.py`: the interface and the built-in planner.
 4. `segmentation.py`, `perturbation.py`: the features of a costmap and their combinations.
-5. `perturbation_dataset.py`: `ScenarioInstance`, the input of every costmap method, and `build_perturbation_dataset`, the only place that queries the planner. `dataset.py` stores a dataset in a file.
+5. `perturbation_dataset.py`: `ScenarioInstance`, the input of every costmap method, and `build_perturbation_dataset`, the only place that queries the planner.
 6. `lime/`, `shap.py`, `anchors/`, `counterfactual.py`: the four methods, each a function of a dataset.
-7. `semantic/`: ontology, semantic map, affordances, QSR, templates, and the visuo-textual pipeline.
+7. `semantic/`: ontology, semantic map, affordances, QSR, templates, and the visuo-textual pipeline, which queries the planner in its own loop.
 8. `pointcloud.py`: the bytes of the coloured point cloud that the nodes publish.
 9. `nav_explain_costmap/nav_explain_costmap/`: `scenarios.py` (three built-in costmaps), `explain.py` (one entry point for the four methods), `render.py` and `evaluation.py` (figures), `apps/` (command-line tools), `ros/node.py`.
 10. `nav_explain_semantic/nav_explain_semantic/`: `scenarios.py` with the data in `nav_explain_semantic/data/`, `render.py`, `apps/`, `ros/node.py`.
@@ -133,7 +129,8 @@ All paths are below `nav_explain_core/nav_explain_core/` unless a package is nam
 - Only a `ros/` folder imports `rclpy`. A test never needs ROS.
 - Row 0 of every perturbation matrix is the real scene, and column 0 is the feature that is never switched off. All methods rely on both.
 - A cell index is `grid[row, col]`, where the row counts along y and the column along x. `world_to_pixel` returns `(col, row)`.
-- A costmap method does not query the planner itself. It receives a dataset, or it calls `build_perturbation_dataset`. The visuo-textual pipeline has its own loop, since its perturbations are affordances and not segments.
+- A costmap method does not query the planner. It receives a dataset from `build_perturbation_dataset`. The visuo-textual pipeline has its own loop, since its perturbations are affordances and not segments.
+- Code that no command-line tool, node or launch file uses is removed. The `humble` branch holds what was removed.
 - Numbers that decide a result are named constants or fields of a configuration class, for example `ElasticBandConfig`, not literals in the code.
 
 ## 9. Running it
@@ -162,67 +159,90 @@ On a laptop, the planner pass over 256 perturbations takes between one and two s
 
 ## 10. The live nodes
 
+The nodes connect the methods to a robot or to a simulation (section 12). All three take their input from topics, so they do not depend on where the data comes from.
+
 **Costmap node** (`nav_explain_costmap/nav_explain_costmap/ros/node.py`). It explains the local costmap of a running navigation stack.
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `method` | `lime` | `lime`, `shap`, `anchors` or `counterfactual` |
 | `costmap_topic` | `/local_costmap/costmap` | `nav_msgs/OccupancyGrid` |
-| `global_plan_topic` | `/plan` | `nav_msgs/Path`, in the frame of the costmap |
+| `global_plan_topic` | `/plan` | `nav_msgs/Path` |
 | `odom_topic` | `/odom` | `nav_msgs/Odometry` |
 | `min_period_s` | `1.0` | shortest time between two explanations, since one explanation takes longer than a costmap update |
 
-It publishes `/nav_explain/image` (`sensor_msgs/Image`), `/nav_explain/layer` (`sensor_msgs/PointCloud2`, one coloured point per cell) and `/nav_explain/text` (`std_msgs/String`).
+It publishes `/nav_explain/image` (`sensor_msgs/Image`), `/nav_explain/layer` (`sensor_msgs/PointCloud2`, one coloured point per cell, in the frame of the costmap) and `/nav_explain/text` (`std_msgs/String`).
+
+For each explanation the node transforms the plan and the robot pose into the frame of the costmap with TF, and it drops the part of the plan that lies behind the robot. While TF does not know a needed transform, the node warns and waits.
 
 **Semantic node** (`nav_explain_semantic/nav_explain_semantic/ros/node.py`). It explains the built-in semantic scenario at the pose the odometry reports.
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `scenario` | `cabinet_room` | name of a built-in scenario |
-| `global_plan_topic` | `/plan` | `nav_msgs/Path` in the `map` frame. Until one arrives, the plan of the scenario is used. |
+| `global_plan_topic` | `/plan` | `nav_msgs/Path`. Until one arrives, the plan of the scenario is used. |
 | `odom_topic` | `/odom` | `nav_msgs/Odometry` |
 | `mode` | `one_off` | `one_off` or `full_2n` |
 | `min_period_s` | `1.0` | shortest time between two explanations |
 
-It publishes `/nav_explain/semantic_layer` (`sensor_msgs/PointCloud2`), `/nav_explain/semantic_text` (`std_msgs/String`) and `/nav_explain/semantic_markers` (`visualization_msgs/MarkerArray`).
+It publishes `/nav_explain/semantic_layer` (`sensor_msgs/PointCloud2`), `/nav_explain/semantic_text` (`std_msgs/String`) and `/nav_explain/semantic_markers` (`visualization_msgs/MarkerArray`), all in the `map` frame. The plan and the odometry are transformed into the `map` frame with TF.
 
 **Perception node** (`nav_explain_perception/nav_explain_perception/ros/node.py`). It reads `sensor_msgs/Image` from the parameter `image_topic` (default `/camera/image_raw`), runs the YOLO model named by the parameter `model` (default `yolov5s`) and publishes `/nav_explain/detections` (`std_msgs/String`). PyTorch is not a declared dependency, since it is large and only this node needs it. Without PyTorch the node starts, warns and publishes nothing. The model is downloaded on first use.
+
+Both launch files take the topic parameters as arguments of the same name, and in addition `use_sim_time` (default `false`) and `rviz` (default `true`).
 
 ## 11. Tests
 
 The tests are in the `test/` folder of each package and need no ROS. `python3 -m pytest` runs them from a checkout, and `colcon test` runs them in a workspace.
 
-They check, among other things: the planner gives the same plan twice and bends around an obstacle, the segmentation reaches the requested number of segments, the Shapley values sum to the difference they have to explain, an explanation from a shared dataset equals the explanation computed alone and needs no further planner query, each affordance changes the costmap as described, and the door is the cause in `cabinet_room`.
+They check, among other things: the planner gives the same plan twice and bends around an obstacle, the segmentation reaches the requested number of segments and gives every obstacle cell a segment, the Shapley values sum to the difference they have to explain, the methods on a shared dataset need no further planner query, a costmap without obstacles gives the answer "nothing to explain", each affordance changes the costmap as described, and the door is the cause in `cabinet_room`.
 
 They do not check: the nodes, the content of a figure, and the YOLO detector with a real model.
 
-## 12. Simulation assets
+## 12. Using a simulation
 
-`nav_explain_sim` holds a generic differential-drive robot (`robot/`), two worlds (`worlds/`) and Nav2 parameters with the TEB controller (`config/nav2_params.yaml`). They were written for ROS 2 Humble with Gazebo Classic. Nothing in the repository uses them, and they have never been run from this repository.
+The repository contains no simulation. A user adds the simulation package of their choice to the workspace, and the nodes attach to it through topics. `README.md` gives the steps. This section gives the reasons.
 
-They are not ported to ROS 2 Lyrical. On 2026-11-24 the Lyrical package repository contained neither the Gazebo Classic packages (`gazebo_ros_pkgs`) nor the TEB controller (`teb_local_planner`). It does contain Nav2 and the current Gazebo with its ROS bridge (`ros_gz`).
+**What the costmap node needs.** A navigation stack that publishes three topics: the local costmap as `nav_msgs/OccupancyGrid`, the global plan as `nav_msgs/Path`, and the odometry as `nav_msgs/Odometry`. The node treats cells of value 99 or 100 as obstacles and all other cells as free. This is how Nav2 publishes its costmap: 100 for a lethal cell, 99 for a cell in which the robot would touch an obstacle, lower values for the inflation around obstacles. The default topic names of the node are the names Nav2 uses.
 
-A port needs four things: the worlds and the robot plugins in the format of the current Gazebo, a Nav2 controller in place of TEB, a launch file, and an implementation of `Ros2ControllerPlanner` (`nav_explain_core/nav_explain_core/planner/ros2_controller.py`) that sends each perturbed costmap to that controller and reads back its plan.
+**Frames.** Nav2 publishes the plan in the `map` frame and, with its default parameters, the local costmap in the `odom` frame. The nodes therefore transform with TF, and the simulation has to publish TF between these frames, as a localisation does. Only x, y and the rotation about the vertical axis are used.
+
+**Time.** A simulation publishes its own clock. With `use_sim_time:=true` a node follows it, which keeps its TF lookups and its throttling in step with the simulation.
+
+**What the semantic node needs.** It does not read a costmap. It knows the world from the ontology of a built-in scenario, so the simulated world has to contain the same objects at the same places. The positions and sizes are in `nav_explain_semantic/data/scenarios/cabinet_room/ontology.csv`, and the map geometry is in `map_info.csv` next to it. The node needs the odometry and the transform from the odometry frame to `map`.
+
+**What is not accepted, and why.**
+
+- A stack that offers its costmap only as `nav2_msgs/Costmap`. The node reads `nav_msgs/OccupancyGrid`.
+- A robot that does not move in a plane. The costmap, the plan and the transforms are two-dimensional.
+- On ROS 2 Lyrical, a package built on Gazebo Classic. On 2026-11-24 the Lyrical package repository contained no Gazebo Classic packages (`gazebo_ros_pkgs`). It contained Nav2, the current Gazebo with its ROS bridge (`ros_gz`), `nav2_minimal_tb3_sim`, `nav2_loopback_sim` and `turtlebot3_gazebo`.
+
+**What a simulation does not change.** The explanation is computed with the built-in planner. The node takes the costmap and the plan from the simulation, and it asks `ElasticBandPlanner` what the robot would do in the perturbed scenes. The controller of the simulation is not queried. Querying it needs a class with the `plan` method of `PlannerBackend` (`nav_explain_core/nav_explain_core/planner/base.py`) that sends each perturbed costmap to that controller and reads back its plan. The explanation methods need the same request to give the same plan, which not every controller does.
+
+Where the facts on Nav2 come from: the parameter file of `nav2_bringup` as packaged for ROS 2 Lyrical (frames, topic of the odometry), and the files `nav2_costmap_2d/src/costmap_2d_publisher.cpp` and `nav2_planner/src/planner_server.cpp` of the Nav2 repository, branch `main`, read on 2026-11-24 (cell values, topic names).
+
+No simulation has been run with this repository. The nodes were checked with a built-in scenario published as test data, with the plan in one frame and the costmap in another.
 
 ## 13. Where the code comes from
 
 The algorithms were ported from an older ROS 1 research code base, which is left as it is. The notes of that port:
 
-- Ported: LIME on the costmap (segmentation, perturbation, weighted Ridge, colouring), the visuo-textual explanation, Anchors, the trajectory metrics, both QSR calculi, and the YOLO detector.
+- Ported: LIME on the costmap (segmentation, perturbation, weighted Ridge, colouring), the visuo-textual explanation, Anchors, the deviation, the single-cross QSR calculus, and the YOLO detector.
 - Added: exact SHAP and the counterfactual, both on the shared dataset.
 - Anchors was reimplemented. The original searched with random sampling. Since the dataset holds every perturbation, the precision is computed exactly here.
 - The deviation is computed with array operations in place of nested loops.
 - The costmap conversion, the colouring and the conversion from metres to cells existed in several copies and now exist once.
-- The Hausdorff distance of the original returned no value, which is corrected.
 - Paths to one user's home folder, wildcard imports and unused code were removed. Type hints, docstrings and tests were added.
 - The original black box was a modified TEB planner in a C++ node, driven through CSV files. That node is not available. `ElasticBandPlanner` takes its place.
 
 The planner is therefore the main difference to the original work. It reproduces the sign of the effect of each obstacle, and with it the colours, rules and suggestions. It does not reproduce the numbers of TEB.
 
+Parts of the port that no method uses are not on this branch: the other trajectory distances (SSPD, Hausdorff, Fréchet, DTW, LCSS, EDR, ERP, OWD), the ternary QSR calculus, the two message types, and the simulation assets for Gazebo Classic with the TEB parameters. They are on the `humble` branch.
+
 ## 14. Open work
 
-- A planner backend that queries a real Nav2 controller, and with it the port of `nav_explain_sim` (section 12).
+- A planner backend that queries the controller of a running navigation stack (section 12).
+- The nodes have been run with test data only. A run with a simulation is the next check.
 - In `doorway_blocked` the gap is closed and no path through it exists. The elastic band does not find the way around the walls. Its points scatter around the obstacle, which is visible in the figures. The deviation is large, as it should be, but the local plan shown is not a path a robot would drive.
-- The nodes publish strings, images and point clouds. The messages `Explanation` and `ObjectAffordance` of `nav_explain_msgs` are defined and not yet published.
+- The nodes publish strings, images and point clouds, and no typed explanation message.
 - The semantic node explains a built-in scenario. Building the semantic map from the detections of the perception node is not implemented.
-- The nodes have been run with fed test data only, not with a navigation stack.

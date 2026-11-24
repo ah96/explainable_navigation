@@ -39,25 +39,6 @@ class CostmapInfo:
     width: int
     height: int
 
-    @classmethod
-    def from_dict(cls, d: dict) -> CostmapInfo:
-        return cls(
-            resolution=float(d["resolution"]),
-            origin_x=float(d["origin_x"]),
-            origin_y=float(d["origin_y"]),
-            width=int(d["width"]),
-            height=int(d["height"]),
-        )
-
-    def to_dict(self) -> dict:
-        return {
-            "resolution": self.resolution,
-            "origin_x": self.origin_x,
-            "origin_y": self.origin_y,
-            "width": self.width,
-            "height": self.height,
-        }
-
 
 def normalize_costmap(raw: np.ndarray) -> np.ndarray:
     """Map a raw occupancy grid to the {0, 99} obstacle convention.
@@ -88,15 +69,3 @@ def world_to_pixels(points: np.ndarray, info: CostmapInfo) -> tuple[np.ndarray, 
     cols = ((points[:, 0] - info.origin_x) / info.resolution).astype(np.intp)
     rows = ((points[:, 1] - info.origin_y) / info.resolution).astype(np.intp)
     return cols, rows
-
-
-def pixel_to_world(col: int, row: int, info: CostmapInfo) -> tuple[float, float]:
-    """Integer (col, row) grid indices -> world (x, y) of the cell centre."""
-    x = info.origin_x + (col + 0.5) * info.resolution
-    y = info.origin_y + (row + 0.5) * info.resolution
-    return x, y
-
-
-def in_bounds(col: int, row: int, info: CostmapInfo) -> bool:
-    """Whether the cell ``(col, row)`` lies inside the grid."""
-    return 0 <= col < info.width and 0 <= row < info.height

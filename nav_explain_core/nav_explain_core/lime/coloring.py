@@ -17,27 +17,25 @@ from __future__ import annotations
 
 import numpy as np
 
-from .ridge_explainer import Explanation
-
 FREE_SPACE_GREY = 0.7
 
 
 def colorize_segments(
     segments: np.ndarray,
-    explanation: Explanation,
+    coef: dict[int, float],
     free_space_shade: float = FREE_SPACE_GREY,
 ) -> np.ndarray:
     """Return an ``(H, W, 3)`` float RGB image in ``[0, 1]``.
 
     Args:
         segments: integer segment labels (0 = free space).
-        explanation: fitted :class:`Explanation` with per-segment coefficients.
+        coef: ``segment label -> weight``, for example LIME coefficients or
+            Shapley values.
     """
     h, w = segments.shape
     img = np.zeros((h, w, 3), dtype=np.float64)
     img[segments == 0] = free_space_shade
 
-    coef = explanation.coef
     max_abs = max((abs(v) for v in coef.values()), default=0.0) or 1.0
 
     for label, weight in coef.items():

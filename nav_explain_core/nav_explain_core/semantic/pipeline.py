@@ -15,11 +15,11 @@ Pipeline:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
-from ..geometry import Pose2D, VelLimits
+from ..geometry import Pose2D
 from ..lime.ridge_explainer import Explanation, RidgeExplainer
 from ..perturbation import MODES
 from ..planner.base import PlannerBackend, PlanRequest
@@ -56,8 +56,6 @@ class VTInstance:
     footprint_radius: float = 0.275
     #: how far each object is grown before planning, in metres
     inflation_radius: float = 0.275
-    #: velocity and acceleration limits of the robot
-    vel_limits: VelLimits = field(default_factory=VelLimits)
     #: short name, used for output folders and figure titles
     name: str = "scenario"
 
@@ -136,7 +134,6 @@ class VisuoTextualExplainer:
             global_plan=instance.global_plan,
             start_pose=instance.robot_pose,
             footprint_radius=instance.footprint_radius,
-            vel_limits=instance.vel_limits,
         )
         result = self.planner.plan(req)
         return result.local_plan, deviation(result.local_plan, instance.global_plan)

@@ -52,8 +52,7 @@ def test_planner_reports_an_empty_plan_for_a_single_point():
     req = _req(np.zeros((80, 80)))
     short = PlanRequest(costmap=req.costmap, costmap_info=req.costmap_info,
                         global_plan=req.global_plan[:1], start_pose=req.start_pose)
-    result = ElasticBandPlanner().plan(short)
-    assert result.local_plan.shape == (0, 2) and result.meta["feasible"] is False
+    assert ElasticBandPlanner().plan(short).local_plan.shape == (0, 2)
 
 
 def test_world_to_pixels_agrees_with_the_scalar_version():
@@ -73,6 +72,14 @@ def test_segmentation_reaches_target():
 def test_segmentation_of_free_space_is_one_segment():
     seg = slic_obstacle_segments(np.zeros((40, 40)), n_target=8)
     assert not seg.any()
+
+
+@pytest.mark.parametrize("size", [1, 2, 5])
+def test_every_obstacle_cell_belongs_to_a_segment(size):
+    cm = np.zeros((40, 40))
+    cm[20:20 + size, 10:10 + size] = 99
+    seg = slic_obstacle_segments(cm, n_target=8)
+    assert ((seg > 0) == (cm > 0)).all()
 
 
 def test_split_and_merge():

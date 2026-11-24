@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.ruff_cache/
 # packaging metadata, written by pip install -e
 *.egg-info/
 # colcon output, in case the repo itself is used as the workspace

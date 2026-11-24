@@ -14,6 +14,9 @@ update it runs :class:`VisuoTextualExplainer` and publishes
 Odometry arrives faster than an explanation is computed, so updates are throttled
 by the parameter ``min_period_s``. Until a plan is received on the plan topic the
 node uses the plan that the scenario defines.
+
+The semantic map is in the ``map`` frame. A plan or an odometry in another frame
+is transformed into it with TF. Planar transforms are assumed.
 """
 
 from __future__ import annotations
@@ -24,15 +27,18 @@ from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.time import Time
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import String
+from tf2_ros import Buffer, TransformException, TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
 from nav_explain_core import Pose2D
-from nav_explain_core.geometry import yaw_from_quaternion
+from nav_explain_core.geometry import transform_points, transform_pose, yaw_from_quaternion
 from nav_explain_core.planner import ElasticBandPlanner
 from nav_explain_core.pointcloud import POINT_FIELDS, POINT_STEP, pack_xyzrgb
 from nav_explain_core.semantic import VisuoTextualExplainer, VTInstance, VTResult
+from nav_explain_core.trajectory import remaining_plan
 
 from ..scenarios import DEFAULT_SCENARIO, load_scenario
 
@@ -57,7 +63,11 @@ class VisuoTextualExplainerNode(Node):
         self.explainer = VisuoTextualExplainer(
             ElasticBandPlanner(), mode=self.get_parameter("mode").value)
         self.min_period_s = float(self.get_parameter("min_period_s").value)
+        self._plan = self.instance.global_plan
+        self._plan_frame = MAP_FRAME
         self._last = -float("inf")
+        self._tf = Buffer()
+        self._tf_listener = TransformListener(self._tf, self)
 
         self.create_subscription(Path, self.get_parameter("global_plan_topic").value, self._on_plan, 1)
         self.create_subscription(Odometry, self.get_parameter("odom_topic").value, self._on_odom, 1)
@@ -68,17 +78,41 @@ class VisuoTextualExplainerNode(Node):
 
     def _on_plan(self, msg: Path) -> None:
         if msg.poses:
-            self.instance.global_plan = np.array(
-                [[p.pose.position.x, p.pose.position.y] for p in msg.poses])
+            self._plan = np.array([[p.pose.position.x, p.pose.position.y] for p in msg.poses])
+            self._plan_frame = msg.header.frame_id
+
+    def _lookup(self, target: str, source: str) -> tuple[float, float, float] | None:
+        """Pose ``(x, y, yaw)`` of the frame ``source`` in the frame ``target``, from TF.
+
+        Data without a frame, or already in the target frame, needs no transform.
+        ``None`` means that TF does not know the transform (yet).
+        """
+        if not source or source == target:
+            return 0.0, 0.0, 0.0
+        try:
+            t = self._tf.lookup_transform(target, source, Time()).transform
+        except TransformException as exc:
+            self.get_logger().warning(f"no transform from '{source}' to '{target}': {exc}",
+                                      throttle_duration_sec=5.0)
+            return None
+        return t.translation.x, t.translation.y, yaw_from_quaternion(t.rotation.z, t.rotation.w)
 
     def _on_odom(self, msg: Odometry) -> None:
         now = self.get_clock().now().nanoseconds * 1e-9
         if now - self._last < self.min_period_s:
             return
+        plan_tf = self._lookup(MAP_FRAME, self._plan_frame)
+        pose_tf = self._lookup(MAP_FRAME, msg.header.frame_id)
+        if plan_tf is None or pose_tf is None:
+            return
         self._last = now
         p = msg.pose.pose
-        self.instance.robot_pose = Pose2D(
-            p.position.x, p.position.y, yaw_from_quaternion(p.orientation.z, p.orientation.w))
+        pose = transform_pose(
+            Pose2D(p.position.x, p.position.y, yaw_from_quaternion(p.orientation.z, p.orientation.w)),
+            *pose_tf)
+        self.instance.robot_pose = pose
+        self.instance.global_plan = remaining_plan(
+            transform_points(self._plan, *plan_tf), pose.x, pose.y)
         self._publish(self.explainer.explain(self.instance))
 
     def _publish(self, result: VTResult) -> None:

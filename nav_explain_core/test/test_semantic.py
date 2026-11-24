@@ -1,14 +1,13 @@
-"""Semantic layer: QSR (single-cross + ternary), ontology, semantic map, affordances."""
+"""Semantic layer: QSR, ontology, semantic map, affordances."""
 
 import math
 
 import numpy as np
 import pytest
 
-from nav_explain_core.geometry import Pose2D
 from nav_explain_core.semantic.affordance import build_affordance_perturbations, object_affordance_pairs
 from nav_explain_core.semantic.ontology import ObjectEntry, Ontology
-from nav_explain_core.semantic.qsr import single_cross_quadrant, ternary_direction, ternary_qsr
+from nav_explain_core.semantic.qsr import single_cross_quadrant
 from nav_explain_core.semantic.semantic_map import SemanticMapInfo, build_semantic_map, inflate
 from nav_explain_core.semantic.templater import descriptive, suggestive
 
@@ -31,19 +30,6 @@ def _info():
 ])
 def test_single_cross(angle, expected):
     assert single_cross_quadrant(angle) == expected
-
-
-@pytest.mark.parametrize("angle,expected", [
-    (0.0, "front"), (math.pi / 2, "left"), (math.pi, "back"), (-math.pi / 2, "right"),
-])
-def test_ternary_direction(angle, expected):
-    assert ternary_direction(angle) == expected
-
-
-def test_ternary_qsr_distance():
-    r = Pose2D(0, 0, 0)
-    assert ternary_qsr(r, (1.0, 0.0), 2.0) == "close-front"
-    assert ternary_qsr(r, (5.0, 0.0), 2.0) == "distant-front"
 
 
 def test_ontology_affordances():

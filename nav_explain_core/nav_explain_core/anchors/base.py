@@ -68,6 +68,9 @@ def find_anchor(
     n_features = data.shape[1]
     if candidate_features is None:
         candidate_features = [f for f in range(n_features) if f != 0]
+    if not candidate_features:
+        # nothing can be part of a rule: the empty anchor, which covers every perturbation
+        return AnchorExplanation(features=[], precision=float(labels.mean()), coverage=1.0)
     if max_len is None:
         max_len = len(candidate_features)
 

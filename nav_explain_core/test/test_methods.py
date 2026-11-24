@@ -6,7 +6,6 @@ import pytest
 from nav_explain_core import CostmapInfo, Pose2D, ScenarioInstance, build_perturbation_dataset
 from nav_explain_core.anchors import AnchorImageExplainer, find_anchor
 from nav_explain_core.counterfactual import counterfactual
-from nav_explain_core.dataset import load_dataset, save_dataset
 from nav_explain_core.lime import LimeCostmapExplainer
 from nav_explain_core.planner import ElasticBandPlanner
 from nav_explain_core.pointcloud import POINT_STEP, pack_xyzrgb
@@ -40,12 +39,6 @@ def test_dataset_shape(dataset):
     assert dataset.local_plan.shape[1] == 2 and len(dataset.local_plan) > 2
 
 
-def test_dataset_survives_a_round_trip_to_disk(dataset, tmp_path):
-    loaded = load_dataset(save_dataset(dataset, tmp_path / "blocked"))
-    for name in ("segments", "labels", "data", "deviations", "local_plan"):
-        assert np.array_equal(getattr(loaded, name), getattr(dataset, name)), name
-
-
 def test_one_off_dataset_matches_the_rows_of_the_full_one(dataset):
     """The planner is deterministic, so both modes give the same deviation per perturbation."""
     one_off = build_perturbation_dataset(_blocked_instance(), ElasticBandPlanner(),
@@ -55,8 +48,11 @@ def test_one_off_dataset_matches_the_rows_of_the_full_one(dataset):
 
 
 def test_lime_runs():
-    r = LimeCostmapExplainer(ElasticBandPlanner(), mode="one_off").explain(_blocked_instance())
+    one_off = build_perturbation_dataset(_blocked_instance(), ElasticBandPlanner(),
+                                         n_target_segments=6, mode="one_off")
+    r = LimeCostmapExplainer().explain(one_off)
     assert r.explanation_image.shape[2] == 3
+    assert r.n_perturbations == one_off.n_features
     assert any(abs(w) > 0 for k, w in r.coefficients.items() if k != 0)
 
 
@@ -82,20 +78,17 @@ def test_anchor_precision(dataset):
     assert 0.0 <= anchor.coverage <= 1.0
 
 
-def test_anchor_image_deterministic():
-    inst = _blocked_instance()
-    a = AnchorImageExplainer(ElasticBandPlanner(), n_target_segments=6).explain(inst)
-    b = AnchorImageExplainer(ElasticBandPlanner(), n_target_segments=6).explain(inst)
-    assert a.anchor_segments == b.anchor_segments
+def test_anchor_of_a_scene_without_features_is_empty():
+    anchor = find_anchor(np.ones((1, 1), dtype=np.int8), np.array([1]))
+    assert anchor.features == [] and anchor.coverage == 1.0
 
 
-def test_anchor_from_a_shared_dataset_equals_the_anchor_from_the_instance(dataset):
-    explainer = AnchorImageExplainer(ElasticBandPlanner(), n_target_segments=6)
-    direct = explainer.explain(_blocked_instance())
-    shared = explainer.explain_dataset(dataset)
-    assert shared.anchor_segments == direct.anchor_segments
-    assert shared.explanation.precision == direct.explanation.precision
-    assert np.array_equal(shared.image, direct.image)
+def test_anchor_image_deterministic(dataset):
+    a = AnchorImageExplainer().explain(dataset)
+    b = AnchorImageExplainer().explain(dataset)
+    assert a.anchor_segments == b.anchor_segments and a.anchor_segments
+    assert np.array_equal(a.image, b.image)
+    assert a.explanation.precision >= 0.9  # the default threshold of the search
 
 
 def test_pointcloud_payload_has_one_point_per_cell():

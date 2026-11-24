@@ -55,18 +55,11 @@ class Ontology:
     def __iter__(self) -> Iterator[ObjectEntry]:
         return iter(self.objects)
 
-    def __len__(self) -> int:
-        return len(self.objects)
-
     def by_id(self, oid: int) -> ObjectEntry:
         for o in self.objects:
             if o.id == oid:
                 return o
         raise KeyError(oid)
-
-    def with_affordances(self) -> list[ObjectEntry]:
-        """Objects that have at least one affordance (the LIME-relevant ones)."""
-        return [o for o in self.objects if o.affordances]
 
 
 def load_ontology(csv_path: Path | str) -> Ontology:

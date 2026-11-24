@@ -24,7 +24,6 @@ from nav_explain_core import (
 from nav_explain_core.anchors.image import AnchorImageExplainer, highlight_segments
 from nav_explain_core.counterfactual import counterfactual
 from nav_explain_core.lime import LimeCostmapExplainer, colorize_segments
-from nav_explain_core.lime.ridge_explainer import Explanation
 from nav_explain_core.planner import ElasticBandPlanner
 from nav_explain_core.planner.base import PlannerBackend
 from nav_explain_core.shap import shapley_values
@@ -57,6 +56,13 @@ class CostmapExplanation:
     text: str = ""
 
 
+def _nothing_to_explain(method: str, dataset: PerturbationDataset) -> CostmapExplanation:
+    """The explanation of a costmap without obstacles: there is no feature to blame."""
+    image = highlight_segments(dataset.segments, [], _CF_REMOVE)
+    return CostmapExplanation(method, image, dataset.segments, dataset.local_plan, {},
+                              "no obstacle in the costmap, nothing to explain")
+
+
 def explain_costmap(
     instance: ScenarioInstance,
     method: str = "lime",
@@ -75,7 +81,10 @@ def explain_costmap(
     planner = planner or ElasticBandPlanner()
 
     if method == "lime":
-        r = LimeCostmapExplainer(planner, mode="one_off", n_target_segments=n_target_segments).explain(instance)
+        one_off = build_perturbation_dataset(instance, planner, n_target_segments, mode="one_off")
+        if not one_off.obstacle_columns:
+            return _nothing_to_explain(method, one_off)
+        r = LimeCostmapExplainer().explain(one_off)
         text = "; ".join(
             f"segment {s} {'increases' if r.coefficients[s] > 0 else 'decreases'} deviation"
             for s in r.explanation.order[:TOP_SEGMENTS] if s != 0
@@ -85,17 +94,18 @@ def explain_costmap(
 
     if dataset is None:
         dataset = build_perturbation_dataset(instance, planner, n_target_segments)
+    if not dataset.obstacle_columns:
+        return _nothing_to_explain(method, dataset)
 
     if method == "shap":
         sh = shapley_values(dataset)
-        expl = Explanation(coef=sh.values, order=sh.order, intercept=sh.base_value, score=0.0)
-        image = colorize_segments(dataset.segments, expl)
+        image = colorize_segments(dataset.segments, sh.values)
         text = "; ".join(f"segment {s}: {sh.values[s]:+.2f}" for s in sh.order[:TOP_SEGMENTS] if s != 0)
         return CostmapExplanation("shap", image, dataset.segments, dataset.local_plan,
                                   dict(sh.values), text)
 
     if method == "anchors":
-        r = AnchorImageExplainer(planner, n_target_segments=n_target_segments).explain_dataset(dataset)
+        r = AnchorImageExplainer().explain(dataset)
         text = (f"anchor = segments {r.anchor_segments} "
                 f"(precision {r.explanation.precision:.2f}, coverage {r.explanation.coverage:.2f}): "
                 f"while these obstacles are present, the robot deviates")

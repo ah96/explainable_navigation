@@ -29,11 +29,6 @@ class Detection:
     #: bounding box in pixels: xmin, ymin, xmax, ymax
     box: tuple[float, float, float, float]
 
-    @property
-    def centroid(self) -> tuple[float, float]:
-        x0, y0, x1, y1 = self.box
-        return 0.5 * (x0 + x1), 0.5 * (y0 + y1)
-
 
 def torch_available() -> bool:
     """Whether PyTorch can be imported in this interpreter."""

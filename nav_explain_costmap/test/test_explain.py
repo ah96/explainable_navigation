@@ -50,6 +50,16 @@ def test_methods_on_a_shared_dataset_need_no_further_planner_query():
         assert shared.local_plan.size  # every method reports the local plan it explains
 
 
+@pytest.mark.parametrize("method", METHODS)
+def test_a_costmap_without_obstacles_has_nothing_to_explain(method):
+    """A live costmap is often empty. The node must then say so instead of failing."""
+    inst = load_scenario("doorway")
+    inst.costmap = np.zeros_like(inst.costmap)
+    expl = explain_costmap(inst, method)
+    assert expl.text == "no obstacle in the costmap, nothing to explain"
+    assert expl.summary == {} and expl.local_plan.size
+
+
 def test_unknown_method_is_rejected():
     with pytest.raises(ValueError):
         explain_costmap(load_scenario("doorway"), "saliency")

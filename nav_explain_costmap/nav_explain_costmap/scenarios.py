@@ -30,24 +30,26 @@ def _base() -> tuple[np.ndarray, CostmapInfo, Pose2D, np.ndarray]:
 
 
 def doorway() -> ScenarioInstance:
+    """A clear doorway between two walls."""
     cm, info, start, plan = _base()
     cm[70:150, 40:70] = 100
     cm[70:150, 90:120] = 100
     return ScenarioInstance(costmap=cm, costmap_info=info, global_plan=plan, start_pose=start,
-                            name="doorway", description="Clear doorway between two walls.")
+                            name="doorway")
 
 
 def doorway_blocked() -> ScenarioInstance:
+    """The doorway, closed by a round obstacle."""
     inst = doorway()
     cm = inst.costmap.copy()
     rr, cc = np.ogrid[:GRID, :GRID]
     cm[(rr - 100) ** 2 + (cc - 80) ** 2 <= 12**2] = 100
     return ScenarioInstance(costmap=cm, costmap_info=inst.costmap_info, global_plan=inst.global_plan,
-                            start_pose=inst.start_pose, name="doorway_blocked",
-                            description="Doorway blocked by a round obstacle.")
+                            start_pose=inst.start_pose, name="doorway_blocked")
 
 
 def clutter() -> ScenarioInstance:
+    """A wider gap with a box and a round obstacle in it, which force a detour."""
     cm, info, start, plan = _base()
     cm[70:150, 30:55] = 100
     cm[70:150, 105:130] = 100
@@ -55,13 +57,14 @@ def clutter() -> ScenarioInstance:
     rr, cc = np.ogrid[:GRID, :GRID]
     cm[(rr - 105) ** 2 + (cc - 92) ** 2 <= 9**2] = 100
     return ScenarioInstance(costmap=cm, costmap_info=info, global_plan=plan, start_pose=start,
-                            name="clutter", description="A box and a round obstacle forcing a detour.")
+                            name="clutter")
 
 
 SCENARIOS = {"doorway": doorway, "doorway_blocked": doorway_blocked, "clutter": clutter}
 
 
 def load_scenario(name: str) -> ScenarioInstance:
+    """Build the scenario of that name."""
     if name not in SCENARIOS:
         raise KeyError(f"unknown scenario '{name}'; available: {sorted(SCENARIOS)}")
     return SCENARIOS[name]()

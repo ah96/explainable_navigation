@@ -13,7 +13,7 @@ This is a faithful, ROS-free port of the original
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from sklearn.linear_model import Ridge
@@ -33,15 +33,12 @@ class Explanation:
             first).
         intercept: surrogate intercept.
         score: weighted R^2 of the surrogate on the perturbation set.
-        local_pred: surrogate prediction on the original instance.
     """
 
     coef: dict[int, float]
     order: list[int]
     intercept: float
     score: float
-    local_pred: float = 0.0
-    used_features: list[int] = field(default_factory=list)
 
 
 class RidgeExplainer:
@@ -128,7 +125,6 @@ class RidgeExplainer:
         model = Ridge(alpha=self.alpha, fit_intercept=True, random_state=self.random_state)
         model.fit(data[:, used], targets, sample_weight=weights)
         score = model.score(data[:, used], targets, sample_weight=weights)
-        local_pred = float(model.predict(data[0, used].reshape(1, -1))[0])
 
         pairs = sorted(
             zip(used, model.coef_), key=lambda t: abs(t[1]), reverse=True
@@ -140,6 +136,4 @@ class RidgeExplainer:
             order=order,
             intercept=float(model.intercept_),
             score=float(score),
-            local_pred=local_pred,
-            used_features=[int(i) for i in used],
         )

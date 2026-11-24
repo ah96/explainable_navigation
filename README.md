@@ -1,6 +1,6 @@
 # explainable_navigation
 
-Methods that explain why a mobile robot leaves its planned path. The robot's local planner is treated as a black box: it receives the local costmap and the global plan, and it returns a local plan. Each method perturbs the scene (it removes obstacles, moves or opens objects), asks the planner again, and reports which part of the scene causes the deviation of the local plan from the global plan. The result is a coloured map and a sentence. The repository is a ROS 2 workspace of seven packages around one library that needs no ROS.
+Methods that explain why a mobile robot leaves its planned path. The robot's local planner is treated as a black box: it receives the local costmap and the global plan, and it returns a local plan. Each method perturbs the scene (it removes obstacles, moves or opens objects), asks the planner again, and reports which part of the scene causes the deviation of the local plan from the global plan. The result is a coloured map and a sentence. The repository is a ROS 2 workspace of five packages around one library that needs no ROS.
 
 | Method | Question it answers | Output |
 |---|---|---|
@@ -15,7 +15,7 @@ Methods that explain why a mobile robot leaves its planned path. The robot's loc
 | Branch | For | State |
 |---|---|---|
 | `lyrical` | ROS 2 Lyrical on Ubuntu 26.04 | this branch, see "Status" for what was checked |
-| `humble` | ROS 2 Humble | the earlier state of the repository, kept unchanged, without the changes of this branch |
+| `humble` | ROS 2 Humble | the first state of the repository, kept unchanged. It still holds what this branch removed as unused. |
 
 ## What it produces
 
@@ -26,7 +26,7 @@ Methods that explain why a mobile robot leaves its planned path. The robot's loc
 [doorway_blocked/shap] segment 3: +1.69; segment 4: +0.52; segment 8: +0.37
 [doorway_blocked/anchors] anchor = segments [1] (precision 0.91, coverage 0.50): while these obstacles are present, the robot deviates
 [doorway_blocked/counterfactual] remove segments [1, 3, 4, 5, 6, 7, 8] -> deviation 0.71 (from 4.06); target met
-[cabinet_room] 5 features, deviation=10.819, runtime=0.111s
+[cabinet_room] 5 features, deviation=10.819, runtime=0.113s
   -> I deviate because of the door right/front of me.
   -> Dear human, please open the door right/front of me.
 ```
@@ -75,15 +75,38 @@ With ROS, a command is `ros2 run <package> <command>`. Without ROS it is `python
 | `colcon test` | workspace | the tests of all packages | 12 s |
 | `python3 -m pytest` | checkout | the same tests without a build | 9 s |
 
-The live nodes, each with RViz unless `rviz:=false` is given:
+## Adding a simulation
 
-| Command | What it does |
-|---|---|
-| `ros2 launch nav_explain_costmap costmap_explainer.launch.py method:=shap` | explains the local costmap of a running navigation stack |
-| `ros2 launch nav_explain_semantic semantic_explainer.launch.py` | explains the built-in semantic scenario at the robot's current pose |
-| `ros2 run nav_explain_perception nav_explain_perception_node` | publishes the detections in a camera image as text |
+The repository ships no simulation. A simulation is a package of your choice that you add to the workspace. The live nodes attach to it through topics, so nothing in this repository has to be changed and no package here depends on it.
 
-Topics and parameters are listed in `TUTORIAL.md`.
+Which simulation packages are accepted:
+
+| Node | The simulation has to provide | Fits without arguments |
+|---|---|---|
+| costmap node | a navigation stack that publishes the local costmap (`nav_msgs/OccupancyGrid`, cells of value 99 or 100 are obstacles), the global plan (`nav_msgs/Path`) and the odometry (`nav_msgs/Odometry`) | Nav2, which publishes them as `/local_costmap/costmap`, `/plan` and `/odom` |
+| semantic node | a world built like a built-in scenario, the odometry, and the TF transform from the odometry frame to `map`. A navigation stack is optional. | a world with the objects of `nav_explain_semantic/data/scenarios/cabinet_room/ontology.csv` |
+| perception node | a camera that publishes `sensor_msgs/Image` in `rgb8` or `bgr8` | a camera on `/camera/image_raw` |
+
+- The simulator itself does not matter, since the nodes see only the topics: Gazebo, another physics simulator, or a simulator without physics.
+- The three inputs may be in different frames, as in Nav2 (plan in `map`, local costmap in `odom`). The nodes transform them with TF, so the simulation has to publish TF between these frames.
+- Not accepted: a stack that publishes its costmap only as `nav2_msgs/Costmap`, a robot that does not move in a plane, and, on ROS 2 Lyrical, a package that needs Gazebo Classic, which is not in the Lyrical package repository.
+
+How to add one:
+
+1. Clone the simulation package into `src/` of the workspace next to this repository, or install it with `apt`. For ROS 2 Lyrical, the package repository offers for example `nav2_bringup` (its `tb3_simulation_launch.py` starts Gazebo and Nav2 with a TurtleBot3) and `turtlebot3_gazebo`.
+2. Run `rosdep install --from-paths src --ignore-src -y` and `colcon build` again.
+3. Start the simulation and its navigation stack, and send a goal, so that a global plan is published.
+4. Start a node of this repository, with the simulated clock:
+
+```bash
+ros2 launch nav_explain_costmap costmap_explainer.launch.py use_sim_time:=true method:=shap
+ros2 launch nav_explain_semantic semantic_explainer.launch.py use_sim_time:=true
+ros2 run nav_explain_perception nav_explain_perception_node --ros-args -p image_topic:=/camera/image_raw
+```
+
+If the simulation uses other topic names, pass `costmap_topic:=`, `global_plan_topic:=` and `odom_topic:=` to the launch file. Each launch file also starts RViz, unless `rviz:=false` is given. The explanation appears on `/nav_explain/text` and, as a coloured layer, in RViz. All topics and parameters are listed in `TUTORIAL.md`.
+
+The explanation is computed with the built-in planner on the costmap and the plan that the simulation publishes. The controller of the simulation is not queried.
 
 ## What is here
 
@@ -94,8 +117,6 @@ nav_explain_costmap/     costmap scenarios, figures, evaluation, live node, laun
 nav_explain_semantic/    semantic scenario with its data, figures, live node, launch, RViz
 nav_explain_perception/  YOLO detector and its node
 nav_explain_bringup/     the demo that runs everything
-nav_explain_msgs/        two message types
-nav_explain_sim/         simulation assets written for ROS 2 Humble, not ported
 TUTORIAL.md              background, methods, design choices, code tour, nodes, open work
 pytest.ini               lets the tests run from a checkout
 requirements.txt         the Python packages, for an environment without ROS
@@ -107,6 +128,7 @@ requirements.txt         the Python packages, for an environment without ROS
 - The built-in planner is deterministic and uses no random number, so that the same scene always gives the same explanation.
 - For the costmap methods, only `build_perturbation_dataset` queries the planner. Methods that are compared share one dataset, since the planner queries are the expensive part.
 - The command-line tools write to the folder given with `--out`, by default `outputs/`, which git ignores.
+- The repository holds only code that a command-line tool, a node or a launch file uses.
 
 ## Status
 
@@ -114,20 +136,18 @@ Checked on 2026-11-24 with ROS 2 Lyrical on Ubuntu 26.04 (Python 3.14, NumPy 2.3
 
 - `colcon build` finishes without warnings, and `colcon test` passes with 57 tests.
 - The tests and all command-line tools except `nep_detect` run with and without a ROS environment.
-- The three nodes start and stop cleanly. Fed with a built-in scenario, the costmap node publishes its three topics for each of the four methods, and the semantic node publishes its three topics. Both launch files start their node with `rviz:=false`.
+- The three nodes start and stop cleanly. Fed with a built-in scenario as test data, the costmap node publishes its three topics for each of the four methods, also with the plan in another frame than the costmap and with a costmap without obstacles. The semantic node publishes its three topics. Both launch files pass their arguments to the node.
 
 Not checked:
 
+- **No simulation and no navigation stack was run with this branch.** The section "Adding a simulation" follows from the interfaces of the nodes and from the defaults of Nav2 as packaged for ROS 2 Lyrical.
 - `rosdep install` and the `pip` route. The Python packages of the check were the Ubuntu packages that `rosdep` names.
-- The RViz configurations on a display, and the nodes with a real navigation stack.
+- The RViz configurations on a display.
 - The YOLO detector. PyTorch was not installed, so only the code around the model is tested.
 
 Not done:
 
 - The built-in elastic-band planner imitates the TEB planner of the original work qualitatively: the sign of the effect of each obstacle, not the numbers.
-- `Ros2ControllerPlanner`, the connection to a real Nav2 controller, is a stub.
-- `nav_explain_sim` is written for Gazebo Classic and the TEB controller. Neither is in the package repository of ROS 2 Lyrical, and the assets are not ported.
-- No node publishes the messages of `nav_explain_msgs` yet. The nodes publish images, point clouds, markers and strings.
 - The tests cover the library and the scenarios. They do not start a node and do not look at a figure.
 
 ## License

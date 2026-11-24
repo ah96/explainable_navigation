@@ -72,21 +72,6 @@ def pair_effect(
     raise ValueError(f"unknown affordance: {affordance}")
 
 
-def perturb_for_pair(
-    costmap: np.ndarray,
-    semantic_map: np.ndarray,
-    info: SemanticMapInfo,
-    ontology: Ontology,
-    obj_id: int,
-    affordance: str,
-) -> np.ndarray:
-    """Return ``costmap`` modified by applying ``affordance`` to ``obj_id``."""
-    mask, value = pair_effect(semantic_map, info, ontology, obj_id, affordance)
-    out = costmap.copy()
-    out[mask] = value
-    return out
-
-
 def build_affordance_perturbations(
     semantic_map: np.ndarray,
     info: SemanticMapInfo,

@@ -25,8 +25,3 @@ def exp_kernel(distances: np.ndarray, kernel_width: float = DEFAULT_KERNEL_WIDTH
     """``sqrt(exp(-(d^2) / kernel_width^2))`` -- the original LIME kernel."""
     distances = np.asarray(distances, dtype=np.float64)
     return np.sqrt(np.exp(-(distances**2) / kernel_width**2))
-
-
-def weights_for(data: np.ndarray, kernel_width: float = DEFAULT_KERNEL_WIDTH) -> np.ndarray:
-    """Convenience: cosine distance -> kernel weight for a perturbation matrix."""
-    return exp_kernel(cosine_distances(data), kernel_width)

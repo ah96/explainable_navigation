@@ -23,7 +23,7 @@ The three forces mirror TEB's weights:
 
 We aim for *qualitative* fidelity to TEB -- the same sign of deviation per
 obstacle, hence the same green/red colouring -- not numeric equality. The
-``Ros2ControllerPlanner`` backend marks the route to a real controller.
+``PlannerBackend`` interface is where a real controller can take its place.
 
 Every iteration updates all band nodes at once from the previous band (a Jacobi
 sweep), so the update is written as array operations over the nodes. The planner
@@ -151,7 +151,7 @@ class ElasticBandPlanner:
         gplan = np.asarray(request.global_plan, dtype=np.float64)
         gplan = self._clip_to_window(gplan, info)
         if len(gplan) < 2:
-            return PlanResult(local_plan=np.empty((0, 2)), meta={"feasible": False})
+            return PlanResult(local_plan=np.empty((0, 2)))
 
         band = self._resample(gplan, cfg.node_spacing)
         # Pin the first node to the robot pose.
@@ -201,14 +201,4 @@ class ElasticBandPlanner:
             new[1:-1] = p + delta * scale[:, None]
             band = new
 
-        # Feasibility: did the final band stay clear of the lethal core?
-        clearances = dist_m[self._cells(band, info)]
-        feasible = bool(np.all(clearances >= request.footprint_radius * 0.5))
-        return PlanResult(
-            local_plan=band,
-            meta={
-                "feasible": feasible,
-                "iterations": cfg.iterations,
-                "min_clearance": float(clearances.min()),
-            },
-        )
+        return PlanResult(local_plan=band)

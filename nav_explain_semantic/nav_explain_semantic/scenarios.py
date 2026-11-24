@@ -50,8 +50,8 @@ def _data_root() -> Path:
 _SPECS = {
     "cabinet_room": {
         "robot_pose": Pose2D(2.0, 1.2, 0.0),
+        # the robot routes through the closed door, past the cabinet
         "waypoints": [(2.0, 1.2), (6.6, 1.0), (7.47, 0.3), (7.47, -1.2)],
-        "description": "Robot routes through the closed door past the cabinet.",
     }
 }
 

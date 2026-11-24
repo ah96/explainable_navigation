@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .costmap import CostmapInfo, normalize_costmap
-from .geometry import Pose2D, VelLimits
+from .geometry import Pose2D
 from .perturbation import apply_perturbation, perturbations
 from .planner.base import PlannerBackend, PlanRequest
 from .segmentation import slic_obstacle_segments
@@ -39,12 +39,8 @@ class ScenarioInstance:
     start_pose: Pose2D
     #: radius of the circular robot footprint in metres
     footprint_radius: float = 0.275
-    #: velocity and acceleration limits of the robot
-    vel_limits: VelLimits = field(default_factory=VelLimits)
     #: short name, used for output folders and figure titles
     name: str = "scenario"
-    #: one sentence on what the scenario shows
-    description: str = ""
 
 
 @dataclass
@@ -82,7 +78,6 @@ def plan_request(instance: ScenarioInstance, costmap: np.ndarray) -> PlanRequest
         global_plan=instance.global_plan,
         start_pose=instance.start_pose,
         footprint_radius=instance.footprint_radius,
-        vel_limits=instance.vel_limits,
     )
 
 

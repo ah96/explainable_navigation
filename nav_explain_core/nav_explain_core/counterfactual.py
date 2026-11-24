@@ -9,7 +9,7 @@ counterfactual (ties broken by lowest resulting deviation) deterministically.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -23,7 +23,6 @@ class CounterfactualExplanation:
     instance_deviation: float
     target: float
     found: bool = True
-    image: np.ndarray | None = field(default=None, repr=False)
 
 
 def counterfactual(dataset: PerturbationDataset, target_ratio: float = 0.25) -> CounterfactualExplanation:

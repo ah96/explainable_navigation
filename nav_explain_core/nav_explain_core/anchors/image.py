@@ -1,7 +1,7 @@
 """Anchors explanation for a local costmap.
 
-Reuses the same segmentation, perturbation and black-box planner as the LIME
-explainer, but instead of fitting an additive surrogate it searches for an
+Reads the same perturbation dataset as the other methods, but instead of
+fitting an additive surrogate it searches for an
 *anchor*: a minimal set of obstacle segments whose presence keeps the robot's
 "deviate" decision. The instance's continuous deviation is binarised into a
 decision (``deviates`` iff deviation >= ``decision_ratio`` * instance deviation)
@@ -15,13 +15,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..perturbation_dataset import (
-    DEFAULT_SEGMENTS,
-    PerturbationDataset,
-    ScenarioInstance,
-    build_perturbation_dataset,
-)
-from ..planner.base import PlannerBackend
+from ..perturbation_dataset import PerturbationDataset
 from .base import AnchorExplanation, find_anchor
 
 ANCHOR_COLOR = (0.0, 0.55, 0.9)  # cyan/blue highlight for anchor segments
@@ -69,27 +63,14 @@ def highlight_segments(
 class AnchorImageExplainer:
     """Finds the obstacle segments whose presence keeps the robot deviating."""
 
-    def __init__(
-        self,
-        planner: PlannerBackend,
-        n_target_segments: int = DEFAULT_SEGMENTS,
-        tau: float = 0.9,
-        decision_ratio: float = 0.5,
-    ) -> None:
-        self.planner = planner
-        self.n_target_segments = n_target_segments
+    def __init__(self, tau: float = 0.9, decision_ratio: float = 0.5) -> None:
+        #: share of the perturbations with the anchor that have to deviate
         self.tau = tau
+        #: a perturbation deviates if it reaches this share of the real deviation
         self.decision_ratio = decision_ratio
 
-    def explain(self, instance: ScenarioInstance) -> AnchorResult:
-        """Query the planner for ``instance`` and search the anchor."""
-        dataset = build_perturbation_dataset(
-            instance, self.planner, self.n_target_segments, mode="full_2n"
-        )
-        return self.explain_dataset(dataset)
-
-    def explain_dataset(self, dataset: PerturbationDataset) -> AnchorResult:
-        """Search the anchor on an existing full dataset (no planner query)."""
+    def explain(self, dataset: PerturbationDataset) -> AnchorResult:
+        """Search the anchor on a full (``full_2n``) perturbation dataset."""
         t0 = time.perf_counter()
         d0 = float(dataset.deviations[0])
         threshold = self.decision_ratio * d0
