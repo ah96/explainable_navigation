@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!--
+  Generic TIAGo-like differential-drive robot for a simulation: a circular
+  footprint of radius 0.275 m on a two-wheel differential drive with a planar
+  laser. It needs no PAL or TIAGo package.
+-->
+<robot name="generic_diffdrive" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:property name="radius" value="0.275"/>
+  <xacro:property name="height" value="0.4"/>
+  <xacro:property name="wheel_radius" value="0.1"/>
+  <xacro:property name="wheel_sep" value="0.4"/>
+
+  <link name="base_footprint"/>
+
+  <link name="base_link">
+    <visual>
+      <geometry><cylinder radius="${radius}" length="${height}"/></geometry>
+      <material name="grey"><color rgba="0.5 0.5 0.5 1"/></material>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="${radius}" length="${height}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="10.0"/>
+      <inertia ixx="0.3" ixy="0" ixz="0" iyy="0.3" iyz="0" izz="0.3"/>
+    </inertial>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius + height/2}"/>
+  </joint>
+
+  <xacro:macro name="wheel" params="prefix y">
+    <link name="${prefix}_wheel">
+      <visual><geometry><cylinder radius="${wheel_radius}" length="0.05"/></geometry></visual>
+      <collision><geometry><cylinder radius="${wheel_radius}" length="0.05"/></geometry></collision>
+      <inertial><mass value="1.0"/>
+        <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/></inertial>
+    </link>
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel"/>
+      <origin xyz="0 ${y} ${-height/2}" rpy="-1.5708 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+  <xacro:wheel prefix="left" y="${wheel_sep/2}"/>
+  <xacro:wheel prefix="right" y="${-wheel_sep/2}"/>
+
+  <link name="base_laser_link">
+    <visual><geometry><box size="0.05 0.05 0.05"/></geometry></visual>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_laser_link"/>
+    <origin xyz="${radius} 0 0"/>
+  </joint>
+
+  <!-- See generic_diffdrive.gazebo.xacro for the diff-drive + laser plugins. -->
+</robot>

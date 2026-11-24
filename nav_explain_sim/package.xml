@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>nav_explain_sim</name>
+  <version>0.1.0</version>
+  <description>Simulation assets (a generic differential-drive robot, two worlds, Nav2 parameters) written for ROS 2 Humble with Gazebo Classic and TEB. They are kept as the starting point of a port and are not used by the other packages.</description>
+  <maintainer email="amar.halilovic@uni-ulm.de">Amar Halilovic</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

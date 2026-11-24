@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- Minimal Gazebo Classic world matching the costmap scenario "doorway": a
+     doorway between two walls. Written for ROS 2 Humble and not ported to the
+     Gazebo of ROS 2 Lyrical (see "Simulation assets" in TUTORIAL.md). -->
+<sdf version="1.6">
+  <world name="doorway">
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <model name="left_wall">
+      <static>true</static>
+      <pose>-0.7 1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.6 2.0 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.6 2.0 1.0</size></box></geometry></visual>
+      </link>
+    </model>
+
+    <model name="right_wall">
+      <static>true</static>
+      <pose>0.7 1.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.6 2.0 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.6 2.0 1.0</size></box></geometry></visual>
+      </link>
+    </model>
+  </world>
+</sdf>

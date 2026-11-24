@@ -1,13 +1,12 @@
-# Headless core dependencies (install into the Python env that runs the pipeline,
-# e.g. ~/venvamar):  pip install -r requirements.txt
-# rclpy ships with ROS2 and is only needed for the optional nodes.
+# Python packages of the explanation library, for a Python environment without
+# ROS:  pip install -r requirements.txt
+# In a ROS 2 workspace they are installed by rosdep from the package.xml files
+# instead, and rclpy comes with ROS.
 numpy>=1.24
 scipy>=1.10
 scikit-learn>=1.3
-scikit-image>=0.22,<0.25
+scikit-image>=0.22
 matplotlib>=3.6
-opencv-python>=4.6
-pandas>=1.5
-shapely>=2.0
-pillow>=9.0
-# perception (optional): torch>=2.0
+# nav_explain_perception only, and not installed by rosdep either:
+#   opencv-python>=4.6   reading the image for nep_detect
+#   torch>=2.0           the YOLO detector

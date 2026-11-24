@@ -1,12 +1,19 @@
+# Python caches, written on every import and test run
 __pycache__/
 *.py[cod]
-*.egg-info/
 .pytest_cache/
 .ruff_cache/
+# packaging metadata, written by pip install -e
+*.egg-info/
+# colcon output, in case the repo itself is used as the workspace
 build/
 install/
 log/
+# output of the command-line tools (--out defaults to outputs/)
 outputs/
+# a local Python environment
+.venv/
+# editor and operating-system files
 .vscode/
 .idea/
 .DS_Store
