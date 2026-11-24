@@ -12,6 +12,7 @@
   <depend>nav_explain_core</depend>
   <depend>nav_explain_costmap</depend>
   <depend>nav_explain_semantic</depend>
+  <depend>nav_explain_hixron</depend>
 
   <test_depend>python3-pytest</test_depend>
 

@@ -13,6 +13,7 @@ provides:
   **Anchors** (``anchors``) and **counterfactual** (``counterfactual``);
 * the semantic map, affordance, QSR and text layer (``semantic``) for
   visuo-textual explanations;
+* the explanation loop that depends on the robot's personality (``hixron``);
 * the point-cloud payload the live nodes publish (``pointcloud``).
 
 Nothing here imports ROS, so it runs headless in a plain Python environment and

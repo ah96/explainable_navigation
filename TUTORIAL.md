@@ -16,8 +16,9 @@ For a reader who is new to the topic. Each section on code names its file.
 10. The live nodes
 11. Tests
 12. Using a simulation
-13. Where the code comes from
-14. Open work
+13. The publications: data, recorded results and their reproduction
+14. Where the code comes from
+15. Open work
 
 ## 1. The project in five minutes
 
@@ -26,6 +27,10 @@ A mobile robot follows a global plan, a path from where it is to its goal. A loc
 This repository answers the question "why does the robot deviate here?" in five ways. Four methods work on the local costmap, the grid of obstacles around the robot: LIME, SHAP, Anchors and a counterfactual. One method, called visuo-textual, works on a semantic map of named objects and answers with a coloured map and a sentence.
 
 All five use the same idea. Change the scene a little, ask the planner again, and see how much the deviation changes.
+
+A sixth method, HiXRoN, answers a different question, and it answers while the robot drives: what is around me, and which moved object made me change my global plan? How often and in how much detail the robot explains follows from its personality (section 5).
+
+The repository also holds the data and the recorded results of four publications (section 13).
 
 Run `neb_demo` (section 9) to see every method on the built-in scenarios.
 
@@ -93,6 +98,25 @@ A feature is a pair of object and affordance (`affordance.py`). Switching a feat
 
 LIME then gives one coefficient per feature (`pipeline.py`). The visual explanation is one map per feature with the object coloured by its coefficient. The textual explanation takes the three features with the largest coefficients. QSR (`qsr.py`) states where the object is relative to the robot, and templates (`templater.py`) form two sentences: a descriptive one ("I deviate because of the door right/front of me.") and a suggestive one ("Dear human, please open the door right/front of me.").
 
+### HiXRoN: explanations that depend on the robot's personality (`nav_explain_core/nav_explain_core/hixron/`)
+
+The methods above explain one moment. This one runs as a loop while the robot drives. It is the explanation loop of the HiXRoN framework of Halilovic and Krivic (2023).
+
+- **Visual** (`layer.py`). A square window around the robot. The objects in it are coloured in five rings, from yellow (near, likely to become an obstacle) to green (far). The object whose move caused a deviation is red, for the next twelve explanations.
+- **Textual** (`text.py`). A sentence that lists the objects around the robot, or names the object that was moved. A rich text places each object relative to the robot: "I am passing by table to my left and bookshelf to my right." A poor text only lists: "Around me are table and bookshelf."
+- **Deviation** (`deviation.py`). A new global plan counts as a deviation when its middle point lies more than 1 m from the middle point of the previous plan, and an object has moved before.
+- **Personality** (`personality.py`). One number, the extroversion between 0 and 1, sets the rest.
+
+| Property | Value | Reason of the publication |
+|---|---|---|
+| representation threshold, in metres | 3.6 - 2.4 x extroversion | extroverts accept others closer to them. 3.6 m and 1.2 m are the edges of the social zone of Hall's social space. |
+| size of the window | the threshold | an extroverted robot gives less detail |
+| timing and duration, in passes of the loop | 20 - 20 x extroversion | extroverts pause less and speak shorter |
+| detail of the text | rich below 0.5, poor from 0.5 on | extroverts use simpler sentences |
+| representation | visual only while a human is nearer than the threshold, visual and textual otherwise | the robot holds back when a human is inside its zone |
+
+One cycle of the loop (`replay.py`, class `Replay`): the robot forms an explanation, waits for the timing, gives it, and keeps it for the duration. A totally extroverted robot forms and gives an explanation on every pass.
+
 ### Qualitative spatial reasoning (`nav_explain_core/nav_explain_core/semantic/qsr.py`)
 
 The single-cross calculus names one of four quadrants around the robot's heading: `left/front`, `right/front`, `left/back`, `right/back`.
@@ -121,8 +145,10 @@ All paths are below `nav_explain_core/nav_explain_core/` unless a package is nam
 8. `pointcloud.py`: the bytes of the coloured point cloud that the nodes publish.
 9. `nav_explain_costmap/nav_explain_costmap/`: `scenarios.py` (three built-in costmaps), `explain.py` (one entry point for the four methods), `render.py` and `evaluation.py` (figures), `apps/` (command-line tools), `ros/node.py`.
 10. `nav_explain_semantic/nav_explain_semantic/`: `scenarios.py` with the data in `nav_explain_semantic/data/`, `render.py`, `apps/`, `ros/node.py`.
-11. `nav_explain_perception/nav_explain_perception/`: `detector.py` and `ros/node.py`.
-12. `nav_explain_bringup/nav_explain_bringup/apps/demo.py`: the demo.
+11. `hixron/`: `personality.py`, `layer.py`, `text.py` and `deviation.py` (section 5), `route.py` (a global route on the semantic map), then `replay.py` (the loop, and the scripted run that drives it).
+12. `nav_explain_hixron/nav_explain_hixron/`: `scenarios.py` (library and office, with the values of the original nodes), `results.py` and `studies.py` (the recorded results of the publications), `render.py`, `apps/`, `ros/node.py`. The data is in `nav_explain_hixron/data/`.
+13. `nav_explain_perception/nav_explain_perception/`: `detector.py` and `ros/node.py`.
+14. `nav_explain_bringup/nav_explain_bringup/apps/demo.py`: the demo.
 
 ## 8. Rules the code keeps
 
@@ -132,6 +158,8 @@ All paths are below `nav_explain_core/nav_explain_core/` unless a package is nam
 - A costmap method does not query the planner. It receives a dataset from `build_perturbation_dataset`. The visuo-textual pipeline has its own loop, since its perturbations are affordances and not segments.
 - Code that no command-line tool, node or launch file uses is removed. The `humble` branch holds what was removed.
 - Numbers that decide a result are named constants or fields of a configuration class, for example `ElasticBandConfig`, not literals in the code.
+- A scripted run uses no clock and no random number. Measured runtimes are written to their own file, so that every other file of a run is the same on every machine.
+- A recorded result is read and never written. `results.py` needs only the standard library, so that the reported numbers can be recomputed anywhere.
 
 ## 9. Running it
 
@@ -143,6 +171,8 @@ Installation is described in `README.md`. The scenarios are built in:
 | `doorway_blocked` | costmap | the same, with a round obstacle that closes the gap |
 | `clutter` | costmap | a wider gap with a box and a round obstacle in it |
 | `cabinet_room` | semantic | a room with cabinet, table, chair and door, and a plan through the closed door |
+| `library` | HiXRoN | a library. Two chairs are moved into the robot's way, one after the other, and the robot deviates twice. |
+| `office` | HiXRoN | an office. A chair is moved into the robot's way, and later a human steps into its way and leaves again. |
 
 What the tools write, each into `<out>/<scenario>/`:
 
@@ -151,7 +181,10 @@ What the tools write, each into `<out>/<scenario>/`:
 | `nec_explain` | `<method>.png`, `comparison.png` (for `--method all`), `summary.txt`, `summary.json` |
 | `nec_figures` | `evaluation.png` with three panels: quality, `robustness`, runtime |
 | `nes_explain` | `explanation_<object>_<affordance>.png`, `explanation_grid.png`, `coefficients.csv`, `explanations.txt`, `timing.json` |
-| `neb_demo` | the files of `nec_explain` below `costmap/` and of `nes_explain` below `semantic/` |
+| `neh_replay` | `explanations.csv` (one row per explanation), `overview.png` (the plans and the driven path), one `explanation_<cause>_tick<n>.png` per deviation or failure |
+| `neh_replay --sweep` | `sweep.csv`, `sweep_runtimes.csv`, `eval_N_exps.png`, `eval_N_artefacts.png`, `eval_runtimes.png` |
+| `neh_results` | `icsr2023_<machine>.csv` with its three figures, `icra2024_studies.csv`, `icra2024_study1_answers.png` |
+| `neb_demo` | the files of `nec_explain` below `costmap/`, of `nes_explain` below `semantic/`, of `neh_replay` below `hixron_1.0/` and `hixron_0.0/`, and of `neh_results` below `results/` |
 
 In `evaluation.png`, quality is the variance minus the mean of the absolute coefficients, and `robustness` is the share of segment pairs that keep their order of importance when LIME sees only a part of the perturbations.
 
@@ -159,7 +192,7 @@ On a laptop, the planner pass over 256 perturbations takes between one and two s
 
 ## 10. The live nodes
 
-The nodes connect the methods to a robot or to a simulation (section 12). All three take their input from topics, so they do not depend on where the data comes from.
+The nodes connect the methods to a robot or to a simulation (section 12). All four take their input from topics, so they do not depend on where the data comes from.
 
 **Costmap node** (`nav_explain_costmap/nav_explain_costmap/ros/node.py`). It explains the local costmap of a running navigation stack.
 
@@ -189,13 +222,28 @@ It publishes `/nav_explain/semantic_layer` (`sensor_msgs/PointCloud2`), `/nav_ex
 
 **Perception node** (`nav_explain_perception/nav_explain_perception/ros/node.py`). It reads `sensor_msgs/Image` from the parameter `image_topic` (default `/camera/image_raw`), runs the YOLO model named by the parameter `model` (default `yolov5s`) and publishes `/nav_explain/detections` (`std_msgs/String`). PyTorch is not a declared dependency, since it is large and only this node needs it. Without PyTorch the node starts, warns and publishes nothing. The model is downloaded on first use.
 
-Both launch files take the topic parameters as arguments of the same name, and in addition `use_sim_time` (default `false`) and `rviz` (default `true`).
+**HiXRoN node** (`nav_explain_hixron/nav_explain_hixron/ros/node.py`). It runs the explanation loop of section 5 on a built-in scenario.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `scenario` | `library` | `library` or `office` |
+| `extroversion` | `1.0` | 0 (introverted) to 1 (extroverted) |
+| `global_plan_topic` | `/plan` | `nav_msgs/Path` |
+| `odom_topic` | `/odom` | `nav_msgs/Odometry` |
+| `tick_period_s` | `0.35` | time of one pass of the loop. The original node took about this long for a pass. |
+| `ontology_origin_x`, `ontology_origin_y` | `0.0` | position of the origin of the ontology coordinates in the `map` frame. In the original runs the map frame started at the robot's spawn pose, and the values were 9.0 and -9.0. |
+
+It publishes `/nav_explain/hixron_layer` (`sensor_msgs/PointCloud2`, the coloured objects only) and `/nav_explain/hixron_text` (`std_msgs/String`, empty while a human is nearer than the threshold), in the `map` frame. A moved object is reported to it on `/nav_explain/hixron_object_moved` as a `std_msgs/String` of the form `<gazebo_label> <x> <y>`, the new centre in the `map` frame. The original node read the moves from the simulator. Here the simulation of the user has to publish them, since the node does not depend on a simulator.
+
+The launch files of the costmap and the semantic node take the topic parameters as arguments of the same name, and in addition `use_sim_time` (default `false`) and `rviz` (default `true`). The launch file of the HiXRoN node takes all parameters of its table except `tick_period_s`, and `use_sim_time`. It starts no RViz.
 
 ## 11. Tests
 
 The tests are in the `test/` folder of each package and need no ROS. `python3 -m pytest` runs them from a checkout, and `colcon test` runs them in a workspace.
 
 They check, among other things: the planner gives the same plan twice and bends around an obstacle, the segmentation reaches the requested number of segments and gives every obstacle cell a segment, the Shapley values sum to the difference they have to explain, the methods on a shared dataset need no further planner query, a costmap without obstacles gives the answer "nothing to explain", each affordance changes the costmap as described, and the door is the cause in `cabinet_room`.
+
+For HiXRoN they check: the formulas of the personality, the colours of the layer, the sentences, the cycle of the loop, a gap as wide as the robot being closed, the two deviations in `library`, the deviation and the failure in `office`, that a run gives the same result twice, and that more extroverted robots explain more often and with less detail. For the publications they compare the recomputed numbers with the reported ones (section 13).
 
 They do not check: the nodes, the content of a figure, and the YOLO detector with a real model.
 
@@ -223,7 +271,58 @@ Where the facts on Nav2 come from: the parameter file of `nav2_bringup` as packa
 
 No simulation has been run with this repository. The nodes were checked with a built-in scenario published as test data, with the plan in one frame and the costmap in another.
 
-## 13. Where the code comes from
+## 13. The publications: data, recorded results and their reproduction
+
+The repository holds what four publications were built on. `README.md` lists the publications and their folders. This section says what each folder holds, how a reported number is recomputed, and where the recomputed number differs from the reported one.
+
+**What is in the folders.**
+
+- `nav_explain_semantic/data/scenarios/cabinet_room/` (HRI 2023): `ontology.csv` and `map_info.csv`, which the scenario `cabinet_room` reads, and the map, the labels of the simulated models and the simulation world of the original run.
+- `nav_explain_hixron/data/icsr2023/scenario/` (ICSR 2023): the same files for the library, with two simulation worlds.
+- `nav_explain_hixron/data/icsr2023/results/`: the folders `laptop`, `laptop2` and `labpc`, each with the files `0.csv` to `10.csv` for the extroversion levels 0 to 1. A file has one row per pass of the explanation loop: the runtime of the visual and of the textual explanation in seconds, the running numbers of both, the objects shown, the words, and the running number of explained deviations.
+- `nav_explain_hixron/data/icra2024/scenario/` (ICRA 2024 and TAHRI 2024): the office, with three simulation worlds.
+- `nav_explain_hixron/data/icra2024/planning/`: the planning domain in PDDL, four problems (an introverted and an extroverted robot, each at a deviation and at a failure) and the four plans that were recorded for them, as graphs in the DOT format.
+- `nav_explain_hixron/data/icra2024/statistics/`: the answers of the user studies, one file per group and one row per participant. `study1/try2` has the groups `v` (visual), `vt` (visual and textual) and `t` (textual) with 42 participants each. `study2` has the groups `i` (introverted robot) and `e` (extroverted robot) with 10 participants each. `study1/try1` is an earlier collection of the first study with 31, 36 and 31 participants.
+
+The ontology of the library and of the office has five more columns than the one of `cabinet_room`: where the pose of the simulated model lies in the box of the object (`mass_centre`), the side a chair faces, whether it stands under a table, and where its label is drawn.
+
+**Recomputed and reported numbers.** `neh_results` reads the recorded files and prints the numbers below. The tests in `nav_explain_hixron/test/test_recorded_results.py` compare them with the publications.
+
+| Publication | Quantity | Reported | Recomputed |
+|---|---|---|---|
+| ICSR 2023 | mean runtime of a visual explanation, `laptop` | 348.90 ms | 348.90 ms |
+| | mean runtime of a textual explanation | 0.34 ms | 0.33 ms |
+| | both together | 349.24 ms | 349.24 ms |
+| | deviations explained | two, and one by the totally introverted robot | the same |
+| ICRA 2024, representation | participants, age | 84, mean 22.75, SD 4.23 | the same |
+| | share of female and of male participants | 60.71 % and 38.10 % | 38.10 % and 60.71 % |
+| | group 1 (visual), mean and SD | 4.24 and 0.99 | 4.24 and 1.00 |
+| | group 2 (visual and textual), mean and SD | 4.62 and 0.58 | the same |
+| | t-test | t = -5.6, p = 3.28e-08 | t = -5.60, p = 3.29e-08 |
+| ICRA 2024, extroversion | participants, age, share of male participants | 20, mean 27.45, SD 5.47, 60 % | the same |
+| | group 1 (introverted), mean and SD | 3.47 and 1.21 | the same |
+| | group 2 (extroverted), mean and SD | 3.77 and 0.77 | 3.77 and 0.87 |
+
+Five reported values differ from the files. Three differ in the last digit: the textual runtime (0.333 ms), the SD of group 1 (0.9989) and the p-value (3.286e-08). The SD of the extroverted group differs in one digit. The shares of female and male participants are exchanged.
+
+The folders `laptop2` and `labpc` are further runs of the same experiment, with mean visual runtimes of 272.20 ms and 467.82 ms. The publication reports `laptop`.
+
+For TAHRI 2024 no reported number can be recomputed. That publication reports 52 participants per group and nine statements. `study1/try1` has nine statements, and 31, 36 and 31 participants. Whether it is an earlier state of that data is not recorded in the files.
+
+**The scripted run.** The experiments of ICSR 2023 ran in a simulator, with a navigation stack for ROS 1. `neh_replay` repeats them without both. The same as in the original run: the ontology and the map geometry, the start pose and the goal, which objects move and where to, the 8 s the robot waits at a failure, and the formulas of section 5. Different:
+
+- The global route is the shortest path on the semantic map (`hixron/route.py`). Cells nearer to an object than 0.275 m, the robot radius of the original set-up, plus one cell are closed. The extra cell is there because the box of an object covers its cells only up to the resolution of the grid. Without it, the gap of 0.55 m that the moved chair leaves in the office stays open by one cell, and the robot does not deviate.
+- The robot follows the route exactly, 0.08 m per pass of the loop. With this step the run of the library has 143 passes. The recorded run of the totally extroverted robot has 177.
+- In the library a chair moves when the robot is nearer than 0.5 m to a trigger point, as in the original node. For the first chair the radius is 0.8 m. The scripted robot passes that point at 0.66 m, so the original radius would never be met.
+- The humans of the library are the three standing models of `icsr_world_1.world`. Which of the two worlds the recorded runs used is not recorded.
+
+The scripted run therefore repeats the procedure and not the numbers. Recorded on `laptop`, the number of visual explanations rises from 3 at extroversion 0 to 177 at extroversion 1, and the mean number of objects falls from 9.33 to 2.27. In the scripted run they go from 4 to 143 and from 14.25 to 2.59. The scripted robot explains both deviations at every level, also at extroversion 0.
+
+**The planning files.** The publication computed the plans with the planner POPF in ROSPlan, for ROS 1. No temporal planner was run for this repository, so the plans are kept as recorded. `dot -Tpdf <plan>.dot` draws one.
+
+**The study files.** Seven columns were removed from every file: nationality, country of residence, the two columns on education, the two on profession, and the job title. They describe a participant in free text, the groups are small, and the repository is public. Age, sex and all answers are kept, since the reported numbers need them.
+
+## 14. Where the code comes from
 
 The algorithms were ported from an older ROS 1 research code base, which is left as it is. The notes of that port:
 
@@ -235,14 +334,28 @@ The algorithms were ported from an older ROS 1 research code base, which is left
 - Paths to one user's home folder, wildcard imports and unused code were removed. Type hints, docstrings and tests were added.
 - The original black box was a modified TEB planner in a C++ node, driven through CSV files. That node is not available. `ElasticBandPlanner` takes its place.
 
+The HiXRoN part was ported from the nodes of the ICSR 2023, ICRA 2024 and TAHRI 2024 experiments. The notes of that port:
+
+- Ported: the personality formulas, the visual layer with its green and yellow colour scheme, the two kinds of text, the detection of a deviation, the cycle of the loop, and the scripts of the two scenarios.
+- The colouring of the rings is computed with array operations in place of one slice per ring and colour channel.
+- The side of an object follows the heading of the robot: an object straight ahead is "in front". The original named the quarter ahead "right" and the quarter to the left "front".
+- The original could not produce the sentence for a moved object in front of the robot, since its condition tested "back" twice. In a rich text it listed objects in front of and behind the robot also as "to my right". Both are corrected.
+- Timing and duration are rounded. The original cut off the decimals, which gave 3 in place of 4 passes at extroversion 0.8.
+- The red object is counted once among the objects shown. The original counted it twice while it was inside the window.
+- The failure sentence is taken from the texts of the original office node. That node showed a list of texts written by hand, each at a fixed time of the run. The other texts of the list are not generated here.
+- Not ported: the two other colour schemes, the arrows that show in which direction an object can be moved, the labels and the path markers for RViz, and the dispatching of the plans by ROSPlan.
+
 The planner is therefore the main difference to the original work. It reproduces the sign of the effect of each obstacle, and with it the colours, rules and suggestions. It does not reproduce the numbers of TEB.
 
 Parts of the port that no method uses are not on this branch: the other trajectory distances (SSPD, Hausdorff, Fréchet, DTW, LCSS, EDR, ERP, OWD), the ternary QSR calculus, the two message types, and the simulation assets for Gazebo Classic with the TEB parameters. They are on the `humble` branch.
 
-## 14. Open work
+## 15. Open work
 
 - A planner backend that queries the controller of a running navigation stack (section 12).
 - The nodes have been run with test data only. A run with a simulation is the next check.
 - In `doorway_blocked` the gap is closed and no path through it exists. The elastic band does not find the way around the walls. Its points scatter around the obstacle, which is visible in the figures. The deviation is large, as it should be, but the local plan shown is not a path a robot would drive.
-- The nodes publish strings, images and point clouds, and no typed explanation message.
+- The nodes publish strings, images and point clouds, and no typed explanation message. The HiXRoN node also receives a moved object as a string.
+- `nav_explain_hixron` has not been built or run with ROS 2 yet.
+- The HiXRoN node has no input for a planning failure. Only the scripted run of `office` shows one.
+- The recorded plans of ICRA 2024 have not been computed again with a temporal planner.
 - The semantic node explains a built-in scenario. Building the semantic map from the detections of the perception node is not implemented.
